@@ -275,7 +275,7 @@ module ActiveRecord
         verify_readonly_attribute(key.to_s)
       end
 
-      updated_count = self.class.unscoped.where(self.class.primary_key => id).update_all(attributes)
+      updated_count = relation_for_update.update_all(attributes)
 
       attributes.each do |k, v|
         raw_write_attribute(k, v)
@@ -448,8 +448,7 @@ module ActiveRecord
         changes[self.class.locking_column] = increment_lock if locking_enabled?
 
         changed_attributes.except!(*changes.keys)
-        primary_key = self.class.primary_key
-        self.class.unscoped.where(primary_key => self[primary_key]).update_all(changes) == 1
+        relation_for_update.update_all(changes) == 1
       end
     end
 
@@ -460,19 +459,12 @@ module ActiveRecord
     end
 
     def destroy_row
-      relation_for_destroy.delete_all
+      relation_for_update.delete_all
     end
 
-    def relation_for_destroy
-      pk         = self.class.primary_key
-      column     = self.class.columns_hash[pk]
-      substitute = self.class.connection.substitute_at(column, 0)
-
-      relation = self.class.unscoped.where(
-        self.class.arel_table[pk].eq(substitute))
-
-      relation.bind_values = [[column, id]]
-      relation
+    def relation_for_update
+      primary_key = self.class.primary_key
+      self.class.unscoped.where(primary_key => self[primary_key])
     end
 
     def create_or_update
